@@ -1,740 +1,821 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Calendar, Bell, Tag, Star, Trash2, Edit3, ChevronDown, ChevronRight, Sun, Moon, BarChart3 } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>할 일 관리</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-const TodoApp = () => {
-  // 상태 관리
-  const [tasks, setTasks] = useState([]);
-  const [newTask, setNewTask] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('created');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showStats, setShowStats] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [selectedTags, setSelectedTags] = useState([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  
-  // 새 할 일 폼 상태
-  const [taskForm, setTaskForm] = useState({
-    title: '',
-    note: '',
-    priority: 'medium',
-    dueDate: '',
-    tags: [],
-    reminder: '',
-    repeat: 'none'
-  });
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #1a202c;
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
 
-  const inputRef = useRef(null);
+        body.dark {
+            background: #1a202c;
+            color: #e2e8f0;
+        }
 
-  // 로컬 스토리지에서 데이터 로드
-  useEffect(() => {
-    const savedTasks = localStorage.getItem('todoTasks');
-    const savedTheme = localStorage.getItem('todoTheme');
-    const savedFilter = localStorage.getItem('todoFilter');
-    
-    if (savedTasks) {
-      setTasks(JSON.parse(savedTasks));
-    }
-    if (savedTheme) {
-      setDarkMode(savedTheme === 'dark');
-    }
-    if (savedFilter) {
-      setFilter(savedFilter);
-    }
-  }, []);
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-  // 데이터 저장
-  useEffect(() => {
-    localStorage.setItem('todoTasks', JSON.stringify(tasks));
-  }, [tasks]);
+        /* 헤더 */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
 
-  useEffect(() => {
-    localStorage.setItem('todoTheme', darkMode ? 'dark' : 'light');
-  }, [darkMode]);
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
 
-  useEffect(() => {
-    localStorage.setItem('todoFilter', filter);
-  }, [filter]);
+        body.dark .header h1 {
+            color: #e2e8f0;
+        }
 
-  // 고유 ID 생성
-  const generateId = () => `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
 
-  // 할 일 추가
-  const addTask = () => {
-    if (!taskForm.title.trim()) return;
+        /* 상단 버튼들 */
+        .top-controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
 
-    const newTaskItem = {
-      id: generateId(),
-      title: taskForm.title.trim(),
-      note: taskForm.note.trim(),
-      completed: false,
-      priority: taskForm.priority,
-      dueDate: taskForm.dueDate || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-      repeat: taskForm.repeat,
-      tags: taskForm.tags,
-      reminder: taskForm.reminder || null,
-      subtasks: []
-    };
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
-    setTasks(prev => [newTaskItem, ...prev]);
-    setTaskForm({
-      title: '',
-      note: '',
-      priority: 'medium',
-      dueDate: '',
-      tags: [],
-      reminder: '',
-      repeat: 'none'
-    });
-    setShowAddForm(false);
-  };
+        .btn-primary {
+            background: #3182ce;
+            color: white;
+        }
 
-  // 할 일 완료 토글
-  const toggleTask = (id) => {
-    setTasks(prev => prev.map(task => 
-      task.id === id 
-        ? { ...task, completed: !task.completed, updatedAt: new Date().toISOString() }
-        : task
-    ));
-  };
+        .btn-primary:hover {
+            background: #2c5282;
+        }
 
-  // 할 일 삭제
-  const deleteTask = (id) => {
-    setTasks(prev => prev.filter(task => task.id !== id));
-  };
+        .btn-secondary {
+            background: white;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
 
-  // 서브태스크 추가
-  const addSubtask = (taskId, subtaskText) => {
-    if (!subtaskText.trim()) return;
-    
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? {
-            ...task, 
-            subtasks: [...task.subtasks, {
-              id: generateId(),
-              text: subtaskText.trim(),
-              completed: false
-            }]
-          }
-        : task
-    ));
-  };
+        .btn-secondary:hover {
+            background: #f7fafc;
+        }
 
-  // 서브태스크 토글
-  const toggleSubtask = (taskId, subtaskId) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? {
-            ...task,
-            subtasks: task.subtasks.map(subtask =>
-              subtask.id === subtaskId 
-                ? { ...subtask, completed: !subtask.completed }
-                : subtask
-            )
-          }
-        : task
-    ));
-  };
+        body.dark .btn-secondary {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-color: #4a5568;
+        }
 
-  // 태그 추가
-  const addTag = (taskId, tag) => {
-    if (!tag.trim()) return;
-    
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, tags: [...new Set([...task.tags, tag.trim()])] }
-        : task
-    ));
-  };
+        body.dark .btn-secondary:hover {
+            background: #4a5568;
+        }
 
-  // 모든 태그 가져오기
-  const getAllTags = () => {
-    const allTags = tasks.flatMap(task => task.tags);
-    return [...new Set(allTags)];
-  };
+        /* 통계 */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
-  // 우선순위 색상
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'text-red-500 border-red-200';
-      case 'medium': return 'text-yellow-500 border-yellow-200';
-      case 'low': return 'text-green-500 border-green-200';
-      default: return 'text-gray-500 border-gray-200';
-    }
-  };
+        body.dark .stats {
+            background: #2d3748;
+        }
 
-  // 마감일 상태 확인
-  const getDueDateStatus = (dueDate) => {
-    if (!dueDate) return null;
-    
-    const now = new Date();
-    const due = new Date(dueDate);
-    const diffHours = (due - now) / (1000 * 60 * 60);
-    
-    if (diffHours < 0) return 'overdue';
-    if (diffHours < 24) return 'due-soon';
-    return 'normal';
-  };
+        .stat-item {
+            text-align: center;
+        }
 
-  // 필터링된 할 일 목록
-  const filteredTasks = tasks.filter(task => {
-    // 완료 상태 필터
-    if (filter === 'completed' && !task.completed) return false;
-    if (filter === 'pending' && task.completed) return false;
-    
-    // 검색어 필터
-    if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    
-    // 태그 필터
-    if (selectedTags.length > 0 && !selectedTags.every(tag => task.tags.includes(tag))) return false;
-    
-    return true;
-  });
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
 
-  // 정렬된 할 일 목록
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    switch (sortBy) {
-      case 'priority':
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        return priorityOrder[b.priority] - priorityOrder[a.priority];
-      case 'dueDate':
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(a.dueDate) - new Date(b.dueDate);
-      case 'created':
-      default:
-        return new Date(b.createdAt) - new Date(a.createdAt);
-    }
-  });
+        .stat-label {
+            font-size: 0.9rem;
+            color: #718096;
+        }
 
-  // 통계 계산
-  const stats = {
-    total: tasks.length,
-    completed: tasks.filter(t => t.completed).length,
-    pending: tasks.filter(t => !t.completed).length,
-    overdue: tasks.filter(t => getDueDateStatus(t.dueDate) === 'overdue').length,
-    highPriority: tasks.filter(t => t.priority === 'high' && !t.completed).length
-  };
+        /* 새 할 일 추가 */
+        .add-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
-  return (
-    <div className={`min-h-screen transition-colors duration-300 ${
-      darkMode 
-        ? 'bg-gray-900 text-white' 
-        : 'bg-gradient-to-br from-blue-50 via-white to-purple-50 text-gray-900'
-    }`}>
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              할 일 관리
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              효율적인 업무 관리로 더 나은 하루를 만들어보세요
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowStats(!showStats)}
-              className={`p-3 rounded-xl transition-all ${
-                darkMode 
-                  ? 'bg-gray-800 hover:bg-gray-700' 
-                  : 'bg-white hover:bg-gray-50 shadow-md'
-              }`}
-            >
-              <BarChart3 size={20} />
-            </button>
-            
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className={`p-3 rounded-xl transition-all ${
-                darkMode 
-                  ? 'bg-gray-800 hover:bg-gray-700' 
-                  : 'bg-white hover:bg-gray-50 shadow-md'
-              }`}
-            >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-          </div>
+        body.dark .add-section {
+            background: #2d3748;
+        }
+
+        .add-trigger {
+            width: 100%;
+            padding: 16px;
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            background: transparent;
+            color: #718096;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .add-trigger:hover {
+            border-color: #3182ce;
+            color: #3182ce;
+        }
+
+        .add-form {
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            transition: border-color 0.2s ease;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        body.dark .input {
+            background: #4a5568;
+            border-color: #718096;
+            color: #e2e8f0;
+        }
+
+        body.dark .input:focus {
+            border-color: #63b3ed;
+        }
+
+        textarea.input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        /* 필터 및 검색 */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .select {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+        }
+
+        body.dark .select {
+            background: #4a5568;
+            border-color: #718096;
+            color: #e2e8f0;
+        }
+
+        /* 할 일 목록 */
+        .tasks {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .task {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+
+        .task:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        body.dark .task {
+            background: #2d3748;
+        }
+
+        .task.completed {
+            opacity: 0.6;
+        }
+
+        .task-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #cbd5e0;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .task-checkbox:hover {
+            border-color: #3182ce;
+        }
+
+        .task-checkbox.completed {
+            background: #48bb78;
+            border-color: #48bb78;
+            color: white;
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .task-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #2d3748;
+        }
+
+        body.dark .task-title {
+            color: #e2e8f0;
+        }
+
+        .task.completed .task-title {
+            text-decoration: line-through;
+            color: #a0aec0;
+        }
+
+        .task-note {
+            color: #718096;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+        }
+
+        .task-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .priority {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .priority-high {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .priority-medium {
+            background: #fef5e7;
+            color: #d69e2e;
+        }
+
+        .priority-low {
+            background: #c6f6d5;
+            color: #2f855a;
+        }
+
+        .due-date {
+            color: #718096;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .overdue {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .due-soon {
+            background: #fef5e7;
+            color: #d69e2e;
+        }
+
+        .task-actions {
+            margin-left: auto;
+        }
+
+        .delete-btn {
+            padding: 6px;
+            background: transparent;
+            border: none;
+            color: #e53e3e;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .delete-btn:hover {
+            background: #fed7d7;
+        }
+
+        /* 빈 상태 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state .emoji {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 1.1rem;
+        }
+
+        /* 숨김 클래스 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 유틸리티 */
+        .blue { color: #3182ce; }
+        .green { color: #48bb78; }
+        .yellow { color: #d69e2e; }
+        .red { color: #e53e3e; }
+        .purple { color: #805ad5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header">
+            <h1>할 일 관리</h1>
+            <p>오늘 해야 할 일들을 체계적으로 관리해보세요</p>
         </div>
 
-        {/* 통계 */}
-        {showStats && (
-          <div className={`grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-4 rounded-2xl ${
-            darkMode ? 'bg-gray-800' : 'bg-white shadow-lg'
-          }`}>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-gray-500">전체</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-              <div className="text-sm text-gray-500">완료</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-              <div className="text-sm text-gray-500">진행중</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
-              <div className="text-sm text-gray-500">지연</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.highPriority}</div>
-              <div className="text-sm text-gray-500">중요</div>
-            </div>
-          </div>
-        )}
-
-        {/* 새 할 일 추가 */}
-        <div className={`mb-6 p-6 rounded-2xl ${
-          darkMode ? 'bg-gray-800' : 'bg-white shadow-lg'
-        }`}>
-          {!showAddForm ? (
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-colors flex items-center justify-center gap-2 text-gray-500 hover:text-blue-500"
-            >
-              <Plus size={20} />
-              새로운 할 일 추가하기
+        <!-- 상단 컨트롤 -->
+        <div class="top-controls">
+            <button id="statsBtn" class="btn btn-secondary">
+                📊 통계
             </button>
-          ) : (
-            <div className="space-y-4">
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="할 일을 입력하세요..."
-                value={taskForm.title}
-                onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
-                className={`w-full p-3 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-700 border-gray-600 focus:border-blue-400' 
-                    : 'bg-gray-50 border-gray-200 focus:border-blue-400'
-                } focus:outline-none focus:ring-2 focus:ring-blue-100`}
-                onKeyPress={(e) => e.key === 'Enter' && addTask()}
-                autoFocus
-              />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <textarea
-                  placeholder="상세 설명 (선택사항)"
-                  value={taskForm.note}
-                  onChange={(e) => setTaskForm(prev => ({ ...prev, note: e.target.value }))}
-                  className={`p-3 rounded-xl border resize-none ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 focus:border-blue-400' 
-                      : 'bg-gray-50 border-gray-200 focus:border-blue-400'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-100`}
-                  rows="2"
-                />
+            <button id="themeBtn" class="btn btn-secondary">
+                🌙 다크모드
+            </button>
+        </div>
+
+        <!-- 통계 -->
+        <div id="statsPanel" class="stats hidden">
+            <div class="stat-item">
+                <div id="totalCount" class="stat-number blue">0</div>
+                <div class="stat-label">전체</div>
+            </div>
+            <div class="stat-item">
+                <div id="completedCount" class="stat-number green">0</div>
+                <div class="stat-label">완료</div>
+            </div>
+            <div class="stat-item">
+                <div id="pendingCount" class="stat-number yellow">0</div>
+                <div class="stat-label">진행중</div>
+            </div>
+            <div class="stat-item">
+                <div id="overdueCount" class="stat-number red">0</div>
+                <div class="stat-label">지연</div>
+            </div>
+            <div class="stat-item">
+                <div id="highPriorityCount" class="stat-number purple">0</div>
+                <div class="stat-label">중요</div>
+            </div>
+        </div>
+
+        <!-- 새 할 일 추가 -->
+        <div class="add-section">
+            <button id="addTrigger" class="add-trigger">
+                ➕ 새로운 할 일 추가하기
+            </button>
+            
+            <div id="addForm" class="add-form hidden">
+                <div class="form-group">
+                    <input id="taskTitle" type="text" class="input" placeholder="할 일을 입력하세요..." />
+                </div>
                 
-                <div className="space-y-3">
-                  <select
-                    value={taskForm.priority}
-                    onChange={(e) => setTaskForm(prev => ({ ...prev, priority: e.target.value }))}
-                    className={`w-full p-3 rounded-xl border ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600' 
-                        : 'bg-gray-50 border-gray-200'
-                    } focus:outline-none`}
-                  >
-                    <option value="low">낮은 우선순위</option>
-                    <option value="medium">보통 우선순위</option>
-                    <option value="high">높은 우선순위</option>
-                  </select>
-                  
-                  <input
-                    type="datetime-local"
-                    value={taskForm.dueDate}
-                    onChange={(e) => setTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                    className={`w-full p-3 rounded-xl border ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600' 
-                        : 'bg-gray-50 border-gray-200'
-                    } focus:outline-none`}
-                  />
+                <div class="form-row">
+                    <div class="form-group">
+                        <textarea id="taskNote" class="input" placeholder="상세 설명 (선택사항)"></textarea>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <select id="taskPriority" class="input">
+                                <option value="medium">⭐ 보통 우선순위</option>
+                                <option value="high">🔥 높은 우선순위</option>
+                                <option value="low">💤 낮은 우선순위</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input id="taskDueDate" type="datetime-local" class="input" />
+                        </div>
+                    </div>
                 </div>
-              </div>
-              
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={addTask}
-                  disabled={!taskForm.title.trim()}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  <Plus size={16} />
-                  추가
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setTaskForm({
-                      title: '',
-                      note: '',
-                      priority: 'medium',
-                      dueDate: '',
-                      tags: [],
-                      reminder: '',
-                      repeat: 'none'
-                    });
-                  }}
-                  className={`px-6 py-2 rounded-xl transition-colors ${
-                    darkMode 
-                      ? 'bg-gray-700 hover:bg-gray-600' 
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  취소
-                </button>
-              </div>
+                
+                <div class="form-actions">
+                    <button id="addBtn" class="btn btn-primary">
+                        ✅ 추가하기
+                    </button>
+                    <button id="cancelBtn" class="btn btn-secondary">
+                        취소
+                    </button>
+                </div>
             </div>
-          )}
         </div>
 
-        {/* 필터 및 검색 */}
-        <div className={`mb-6 p-4 rounded-2xl ${
-          darkMode ? 'bg-gray-800' : 'bg-white shadow-lg'
-        }`}>
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-64">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="할 일 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 rounded-xl border ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600' 
-                      : 'bg-gray-50 border-gray-200'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-100`}
-                />
-              </div>
-            </div>
+        <!-- 필터 및 검색 -->
+        <div class="controls">
+            <input id="searchInput" type="text" class="input search-input" placeholder="🔍 할 일 검색..." />
             
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className={`px-4 py-2 rounded-xl border ${
-                darkMode 
-                  ? 'bg-gray-700 border-gray-600' 
-                  : 'bg-gray-50 border-gray-200'
-              } focus:outline-none`}
-            >
-              <option value="all">전체 보기</option>
-              <option value="pending">미완료만</option>
-              <option value="completed">완료만</option>
+            <select id="filterSelect" class="select">
+                <option value="all">전체 보기</option>
+                <option value="pending">미완료만</option>
+                <option value="completed">완료만</option>
             </select>
             
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className={`px-4 py-2 rounded-xl border ${
-                darkMode 
-                  ? 'bg-gray-700 border-gray-600' 
-                  : 'bg-gray-50 border-gray-200'
-              } focus:outline-none`}
-            >
-              <option value="created">생성일순</option>
-              <option value="priority">우선순위순</option>
-              <option value="dueDate">마감일순</option>
+            <select id="sortSelect" class="select">
+                <option value="created">최신순</option>
+                <option value="priority">우선순위순</option>
+                <option value="dueDate">마감일순</option>
             </select>
-          </div>
-          
-          {/* 태그 필터 */}
-          {getAllTags().length > 0 && (
-            <div className="mt-4">
-              <div className="flex flex-wrap gap-2">
-                {getAllTags().map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => {
-                      setSelectedTags(prev => 
-                        prev.includes(tag) 
-                          ? prev.filter(t => t !== tag)
-                          : [...prev, tag]
-                      );
-                    }}
-                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                      selectedTags.includes(tag)
-                        ? 'bg-blue-600 text-white'
-                        : darkMode 
-                          ? 'bg-gray-700 hover:bg-gray-600' 
-                          : 'bg-gray-200 hover:bg-gray-300'
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* 할 일 목록 */}
-        <div className="space-y-3">
-          {sortedTasks.length === 0 ? (
-            <div className={`text-center py-12 ${
-              darkMode ? 'text-gray-400' : 'text-gray-500'
-            }`}>
-              <div className="text-6xl mb-4">📝</div>
-              <p className="text-lg">
-                {tasks.length === 0 
-                  ? '아직 할 일이 없습니다. 새로운 할 일을 추가해보세요!' 
-                  : '검색 조건에 맞는 할 일이 없습니다.'}
-              </p>
+        <!-- 할 일 목록 -->
+        <div id="tasksList" class="tasks">
+            <div id="emptyState" class="empty-state">
+                <div class="emoji">📝</div>
+                <p>아직 할 일이 없습니다.<br>새로운 할 일을 추가해보세요!</p>
             </div>
-          ) : (
-            sortedTasks.map(task => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={toggleTask}
-                onDelete={deleteTask}
-                onAddSubtask={addSubtask}
-                onToggleSubtask={toggleSubtask}
-                onAddTag={addTag}
-                darkMode={darkMode}
-                getPriorityColor={getPriorityColor}
-                getDueDateStatus={getDueDateStatus}
-              />
-            ))
-          )}
         </div>
-      </div>
     </div>
-  );
-};
 
-// 개별 할 일 컴포넌트
-const TaskItem = ({ 
-  task, 
-  onToggle, 
-  onDelete, 
-  onAddSubtask, 
-  onToggleSubtask, 
-  onAddTag, 
-  darkMode, 
-  getPriorityColor, 
-  getDueDateStatus 
-}) => {
-  const [expanded, setExpanded] = useState(false);
-  const [newSubtask, setNewSubtask] = useState('');
-  const [newTag, setNewTag] = useState('');
+    <script>
+        // 앱 상태
+        let tasks = [];
+        let filter = 'all';
+        let sortBy = 'created';
+        let searchTerm = '';
+        let darkMode = false;
+        let showStats = false;
 
-  const dueDateStatus = getDueDateStatus(task.dueDate);
-  const completedSubtasks = task.subtasks.filter(st => st.completed).length;
+        // DOM 요소
+        const elements = {
+            statsBtn: document.getElementById('statsBtn'),
+            themeBtn: document.getElementById('themeBtn'),
+            statsPanel: document.getElementById('statsPanel'),
+            addTrigger: document.getElementById('addTrigger'),
+            addForm: document.getElementById('addForm'),
+            taskTitle: document.getElementById('taskTitle'),
+            taskNote: document.getElementById('taskNote'),
+            taskPriority: document.getElementById('taskPriority'),
+            taskDueDate: document.getElementById('taskDueDate'),
+            addBtn: document.getElementById('addBtn'),
+            cancelBtn: document.getElementById('cancelBtn'),
+            searchInput: document.getElementById('searchInput'),
+            filterSelect: document.getElementById('filterSelect'),
+            sortSelect: document.getElementById('sortSelect'),
+            tasksList: document.getElementById('tasksList'),
+            emptyState: document.getElementById('emptyState'),
+            totalCount: document.getElementById('totalCount'),
+            completedCount: document.getElementById('completedCount'),
+            pendingCount: document.getElementById('pendingCount'),
+            overdueCount: document.getElementById('overdueCount'),
+            highPriorityCount: document.getElementById('highPriorityCount')
+        };
 
-  return (
-    <div className={`p-4 rounded-2xl transition-all ${
-      darkMode ? 'bg-gray-800' : 'bg-white shadow-lg'
-    } ${task.completed ? 'opacity-60' : ''}`}>
-      <div className="flex items-start gap-4">
-        {/* 체크박스 */}
-        <button
-          onClick={() => onToggle(task.id)}
-          className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-            task.completed 
-              ? 'bg-green-500 border-green-500 text-white' 
-              : `border-gray-300 hover:border-blue-400 ${getPriorityColor(task.priority)}`
-          }`}
-        >
-          {task.completed && '✓'}
-        </button>
+        // 초기화
+        function init() {
+            loadData();
+            bindEvents();
+            render();
+        }
 
-        <div className="flex-1">
-          {/* 제목과 우선순위 */}
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className={`text-lg font-semibold ${
-              task.completed ? 'line-through text-gray-500' : ''
-            }`}>
-              {task.title}
-            </h3>
+        // 데이터 로드
+        function loadData() {
+            const savedTasks = localStorage.getItem('todoTasks');
+            const savedTheme = localStorage.getItem('todoTheme');
+            const savedFilter = localStorage.getItem('todoFilter');
             
-            <div className={`px-2 py-1 rounded-full text-xs border ${getPriorityColor(task.priority)}`}>
-              {task.priority === 'high' ? '🔥 높음' : 
-               task.priority === 'medium' ? '⭐ 보통' : '💤 낮음'}
-            </div>
+            if (savedTasks) tasks = JSON.parse(savedTasks);
+            if (savedTheme) darkMode = savedTheme === 'dark';
+            if (savedFilter) {
+                filter = savedFilter;
+                elements.filterSelect.value = filter;
+            }
+        }
 
-            {dueDateStatus === 'overdue' && (
-              <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
-                지연됨
-              </span>
-            )}
-            {dueDateStatus === 'due-soon' && (
-              <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">
-                임박
-              </span>
-            )}
-          </div>
+        // 데이터 저장
+        function saveData() {
+            localStorage.setItem('todoTasks', JSON.stringify(tasks));
+            localStorage.setItem('todoTheme', darkMode ? 'dark' : 'light');
+            localStorage.setItem('todoFilter', filter);
+        }
 
-          {/* 메모 */}
-          {task.note && (
-            <p className={`text-sm mb-2 ${
-              darkMode ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              {task.note}
-            </p>
-          )}
+        // 이벤트 바인딩
+        function bindEvents() {
+            // 통계 토글
+            elements.statsBtn.addEventListener('click', () => {
+                showStats = !showStats;
+                elements.statsPanel.classList.toggle('hidden', !showStats);
+                elements.statsBtn.textContent = showStats ? '📊 통계 숨기기' : '📊 통계';
+            });
 
-          {/* 마감일 */}
-          {task.dueDate && (
-            <div className="flex items-center gap-1 text-sm text-gray-500 mb-2">
-              <Calendar size={14} />
-              {new Date(task.dueDate).toLocaleString('ko-KR')}
-            </div>
-          )}
+            // 테마 토글
+            elements.themeBtn.addEventListener('click', () => {
+                darkMode = !darkMode;
+                document.body.classList.toggle('dark', darkMode);
+                elements.themeBtn.textContent = darkMode ? '☀️ 라이트모드' : '🌙 다크모드';
+                saveData();
+            });
 
-          {/* 태그 */}
-          {task.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {task.tags.map(tag => (
-                <span
-                  key={tag}
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    darkMode 
-                      ? 'bg-gray-700 text-gray-300' 
-                      : 'bg-blue-100 text-blue-700'
-                  }`}
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
+            // 할 일 추가 폼 토글
+            elements.addTrigger.addEventListener('click', showAddForm);
+            elements.cancelBtn.addEventListener('click', hideAddForm);
+            elements.addBtn.addEventListener('click', addTask);
+            elements.taskTitle.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addTask();
+            });
 
-          {/* 서브태스크 */}
-          {task.subtasks.length > 0 && (
-            <div className="mb-2">
-              <div className="text-sm text-gray-500 mb-1">
-                진행률: {completedSubtasks}/{task.subtasks.length}
-              </div>
-              <div className={`w-full h-2 rounded-full ${
-                darkMode ? 'bg-gray-700' : 'bg-gray-200'
-              }`}>
-                <div
-                  className="h-full bg-green-500 rounded-full transition-all"
-                  style={{ width: `${(completedSubtasks / task.subtasks.length) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
+            // 검색 및 필터
+            elements.searchInput.addEventListener('input', (e) => {
+                searchTerm = e.target.value;
+                render();
+            });
 
-          {/* 확장 가능한 영역 */}
-          {expanded && (
-            <div className="mt-4 space-y-3">
-              {/* 서브태스크 목록 */}
-              {task.subtasks.map(subtask => (
-                <div key={subtask.id} className="flex items-center gap-2 ml-4">
-                  <button
-                    onClick={() => onToggleSubtask(task.id, subtask.id)}
-                    className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
-                      subtask.completed 
-                        ? 'bg-green-500 border-green-500 text-white' 
-                        : 'border-gray-300'
-                    }`}
-                  >
-                    {subtask.completed && '✓'}
-                  </button>
-                  <span className={subtask.completed ? 'line-through text-gray-500' : ''}>
-                    {subtask.text}
-                  </span>
+            elements.filterSelect.addEventListener('change', (e) => {
+                filter = e.target.value;
+                saveData();
+                render();
+            });
+
+            elements.sortSelect.addEventListener('change', (e) => {
+                sortBy = e.target.value;
+                render();
+            });
+        }
+
+        // 할 일 추가 폼 표시
+        function showAddForm() {
+            elements.addTrigger.classList.add('hidden');
+            elements.addForm.classList.remove('hidden');
+            elements.taskTitle.focus();
+        }
+
+        // 할 일 추가 폼 숨기기
+        function hideAddForm() {
+            elements.addTrigger.classList.remove('hidden');
+            elements.addForm.classList.add('hidden');
+            elements.taskTitle.value = '';
+            elements.taskNote.value = '';
+            elements.taskPriority.value = 'medium';
+            elements.taskDueDate.value = '';
+        }
+
+        // 할 일 추가
+        function addTask() {
+            const title = elements.taskTitle.value.trim();
+            if (!title) return;
+
+            const task = {
+                id: Date.now().toString(),
+                title: title,
+                note: elements.taskNote.value.trim(),
+                completed: false,
+                priority: elements.taskPriority.value,
+                dueDate: elements.taskDueDate.value || null,
+                createdAt: new Date().toISOString()
+            };
+
+            tasks.unshift(task);
+            saveData();
+            hideAddForm();
+            render();
+        }
+
+        // 할 일 완료 토글
+        function toggleTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                saveData();
+                render();
+            }
+        }
+
+        // 할 일 삭제
+        function deleteTask(id) {
+            if (confirm('정말 삭제하시겠습니까?')) {
+                tasks = tasks.filter(t => t.id !== id);
+                saveData();
+                render();
+            }
+        }
+
+        // 마감일 상태 확인
+        function getDueDateStatus(dueDate) {
+            if (!dueDate) return null;
+            
+            const now = new Date();
+            const due = new Date(dueDate);
+            const diffHours = (due - now) / (1000 * 60 * 60);
+            
+            if (diffHours < 0) return 'overdue';
+            if (diffHours < 24) return 'due-soon';
+            return 'normal';
+        }
+
+        // 할 일 필터링 및 정렬
+        function getFilteredTasks() {
+            let filtered = tasks.filter(task => {
+                if (filter === 'completed' && !task.completed) return false;
+                if (filter === 'pending' && task.completed) return false;
+                if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                return true;
+            });
+
+            return filtered.sort((a, b) => {
+                switch (sortBy) {
+                    case 'priority':
+                        const priorityOrder = { high: 3, medium: 2, low: 1 };
+                        return priorityOrder[b.priority] - priorityOrder[a.priority];
+                    case 'dueDate':
+                        if (!a.dueDate && !b.dueDate) return 0;
+                        if (!a.dueDate) return 1;
+                        if (!b.dueDate) return -1;
+                        return new Date(a.dueDate) - new Date(b.dueDate);
+                    default:
+                        return new Date(b.createdAt) - new Date(a.createdAt);
+                }
+            });
+        }
+
+        // 통계 업데이트
+        function updateStats() {
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.completed).length;
+            const pending = total - completed;
+            const overdue = tasks.filter(t => getDueDateStatus(t.dueDate) === 'overdue').length;
+            const highPriority = tasks.filter(t => t.priority === 'high' && !t.completed).length;
+
+            elements.totalCount.textContent = total;
+            elements.completedCount.textContent = completed;
+            elements.pendingCount.textContent = pending;
+            elements.overdueCount.textContent = overdue;
+            elements.highPriorityCount.textContent = highPriority;
+        }
+
+        // 할 일 HTML 생성
+        function createTaskHTML(task) {
+            const dueDateStatus = getDueDateStatus(task.dueDate);
+            const priorityIcons = {
+                high: '🔥 높음',
+                medium: '⭐ 보통',
+                low: '💤 낮음'
+            };
+
+            return `
+                <div class="task ${task.completed ? 'completed' : ''}">
+                    <div class="task-header">
+                        <div class="task-checkbox ${task.completed ? 'completed' : ''}" onclick="toggleTask('${task.id}')">
+                            ${task.completed ? '✓' : ''}
+                        </div>
+                        <div class="task-content">
+                            <div class="task-title">${task.title}</div>
+                            ${task.note ? `<div class="task-note">${task.note}</div>` : ''}
+                            <div class="task-meta">
+                                <div class="priority priority-${task.priority}">
+                                    ${priorityIcons[task.priority]}
+                                </div>
+                                ${task.dueDate ? `
+                                    <div class="due-date">
+                                        📅 ${new Date(task.dueDate).toLocaleString('ko-KR')}
+                                    </div>
+                                ` : ''}
+                                ${dueDateStatus === 'overdue' ? '<div class="status-badge overdue">지연됨</div>' : ''}
+                                ${dueDateStatus === 'due-soon' ? '<div class="status-badge due-soon">임박</div>' : ''}
+                            </div>
+                        </div>
+                        <div class="task-actions">
+                            <button class="delete-btn" onclick="deleteTask('${task.id}')">🗑️</button>
+                        </div>
+                    </div>
                 </div>
-              ))}
+            `;
+        }
 
-              {/* 새 서브태스크 추가 */}
-              <div className="flex gap-2 ml-4">
-                <input
-                  type="text"
-                  placeholder="서브 할 일 추가..."
-                  value={newSubtask}
-                  onChange={(e) => setNewSubtask(e.target.value)}
-                  className={`flex-1 px-3 py-1 text-sm rounded border ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600' 
-                      : 'bg-gray-50 border-gray-200'
-                  } focus:outline-none`}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      onAddSubtask(task.id, newSubtask);
-                      setNewSubtask('');
-                    }
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    onAddSubtask(task.id, newSubtask);
-                    setNewSubtask('');
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                >
-                  추가
-                </button>
-              </div>
+        // 렌더링
+        function render() {
+            const filteredTasks = getFilteredTasks();
+            updateStats();
 
-              {/* 새 태그 추가 */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="태그 추가..."
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  className={`flex-1 px-3 py-1 text-sm rounded border ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600' 
-                      : 'bg-gray-50 border-gray-200'
-                  } focus:outline-none`}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      onAddTag(task.id, newTag);
-                      setNewTag('');
-                    }
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    onAddTag(task.id, newTag);
-                    setNewTag('');
-                  }}
-                  className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
-                >
-                  태그
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            if (filteredTasks.length === 0) {
+                elements.emptyState.style.display = 'block';
+                elements.tasksList.innerHTML = '';
+                elements.tasksList.appendChild(elements.emptyState);
+            } else {
+                elements.emptyState.style.display = 'none';
+                elements.tasksList.innerHTML = filteredTasks.map(createTaskHTML).join('');
+            }
 
-        {/* 액션 버튼 */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode 
-                ? 'hover:bg-gray-700' 
-                : 'hover:bg-gray-100'
-            }`}
-          >
-            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </button>
-          
-          <button
-            onClick={() => onDelete(task.id)}
-            className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+            // 테마 적용
+            document.body.classList.toggle('dark', darkMode);
+            elements.themeBtn.textContent = darkMode ? '☀️ 라이트모드' : '🌙 다크모드';
+        }
 
-export default TodoApp;
+        // 전역 함수
+        window.toggleTask = toggleTask;
+        window.deleteTask = deleteTask;
+
+        // 앱 시작
+        init();
+    </script>
+</body>
+</html>
